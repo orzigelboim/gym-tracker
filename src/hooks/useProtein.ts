@@ -1,10 +1,25 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../lib/supabase'
 import { ProteinEntry } from '../types'
 import toast from 'react-hot-toast'
 
 function queryKey(date: string) {
   return ['protein', date]
+}
+
+function lsKey(date: string) {
+  return `gym-protein-${date}`
+}
+
+function readEntries(date: string): ProteinEntry[] {
+  try {
+    const raw = localStorage.getItem(lsKey(date))
+    if (raw) return JSON.parse(raw) as ProteinEntry[]
+  } catch {}
+  return []
+}
+
+function writeEntries(date: string, entries: ProteinEntry[]): void {
+  localStorage.setItem(lsKey(date), JSON.stringify(entries))
 }
 
 interface AddEntryData {
@@ -14,37 +29,27 @@ interface AddEntryData {
 }
 
 async function fetchEntries(date: string): Promise<ProteinEntry[]> {
-  const { data, error } = await supabase
-    .from('protein_entries')
-    .select('*')
-    .eq('date', date)
-    .order('created_at', { ascending: true })
-
-  if (error) throw new Error(error.message)
-
-  return (data ?? []).map((row) => ({
-    id: row.id as number,
-    date: row.date as string,
-    food_name: row.food_name as string,
-    grams: row.grams as number,
-    created_at: row.created_at as string,
-  }))
+  return readEntries(date).sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  )
 }
 
 async function insertEntry(data: AddEntryData): Promise<ProteinEntry> {
-  const { data: result, error } = await supabase
-    .from('protein_entries')
-    .insert([data])
-    .select()
-    .single()
-
-  if (error) throw new Error(error.message)
-  return result as ProteinEntry
+  const entries = readEntries(data.date)
+  const entry: ProteinEntry = {
+    id: Date.now(),
+    date: data.date,
+    food_name: data.food_name,
+    grams: data.grams,
+    created_at: new Date().toISOString(),
+  }
+  entries.push(entry)
+  writeEntries(data.date, entries)
+  return entry
 }
 
-async function removeEntry(id: number): Promise<void> {
-  const { error } = await supabase.from('protein_entries').delete().eq('id', id)
-  if (error) throw new Error(error.message)
+async function removeEntry(id: number, date: string): Promise<void> {
+  writeEntries(date, readEntries(date).filter((e) => e.id !== id))
 }
 
 export function useProtein(date: string) {
@@ -89,7 +94,7 @@ export function useProtein(date: string) {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: removeEntry,
+    mutationFn: (id: number) => removeEntry(id, date),
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: queryKey(date) })
       const previousEntries = queryClient.getQueryData<ProteinEntry[]>(queryKey(date))

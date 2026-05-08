@@ -1,9 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../lib/supabase'
 import { Session, LoggedExercise } from '../types'
 import toast from 'react-hot-toast'
 
 const QUERY_KEY = ['sessions']
+const LS_KEY = 'gym-sessions'
+
+function readSessions(): Session[] {
+  try {
+    const raw = localStorage.getItem(LS_KEY)
+    if (raw) return JSON.parse(raw) as Session[]
+  } catch {}
+  return []
+}
+
+function writeSessions(sessions: Session[]): void {
+  localStorage.setItem(LS_KEY, JSON.stringify(sessions))
+}
 
 interface AddSessionData {
   day_id: string
@@ -14,37 +26,29 @@ interface AddSessionData {
 }
 
 async function fetchSessions(): Promise<Session[]> {
-  const { data, error } = await supabase
-    .from('sessions')
-    .select('*')
-    .order('created_at', { ascending: false })
-
-  if (error) throw new Error(error.message)
-
-  return (data ?? []).map((row) => ({
-    id: row.id as string,
-    day_id: row.day_id as string,
-    day_name: row.day_name as string,
-    day_color: row.day_color as string,
-    exercises: row.exercises as LoggedExercise[],
-    note: row.note as string,
-    created_at: row.created_at as string,
-  }))
+  return readSessions().sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  )
 }
 
 async function insertSession(data: AddSessionData): Promise<void> {
-  const { error } = await supabase.from('sessions').insert([data])
-  if (error) throw new Error(error.message)
+  const sessions = readSessions()
+  sessions.push({
+    ...data,
+    id: crypto.randomUUID(),
+    created_at: new Date().toISOString(),
+  })
+  writeSessions(sessions)
 }
 
 async function removeSession(id: string): Promise<void> {
-  const { error } = await supabase.from('sessions').delete().eq('id', id)
-  if (error) throw new Error(error.message)
+  writeSessions(readSessions().filter((s) => s.id !== id))
 }
 
 async function patchSession(id: string, fields: Partial<Pick<Session, 'day_name' | 'note'>>): Promise<void> {
-  const { error } = await supabase.from('sessions').update(fields).eq('id', id)
-  if (error) throw new Error(error.message)
+  writeSessions(
+    readSessions().map((s) => (s.id === id ? { ...s, ...fields } : s))
+  )
 }
 
 export function useSessions() {
