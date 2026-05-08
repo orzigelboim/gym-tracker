@@ -1,30 +1,39 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { supabase } from '../lib/supabase'
 import { DEFAULT_PROGRAM } from '../lib/constants'
 import { WorkoutDay } from '../types'
 import toast from 'react-hot-toast'
 
 const QUERY_KEY = ['program']
-const LS_KEY = 'gym-program'
-
-function readProgram(): WorkoutDay[] {
-  try {
-    const raw = localStorage.getItem(LS_KEY)
-    if (raw) return JSON.parse(raw) as WorkoutDay[]
-  } catch {}
-  return []
-}
-
-function writeProgram(days: WorkoutDay[]): void {
-  localStorage.setItem(LS_KEY, JSON.stringify(days))
-}
 
 async function fetchProgram(): Promise<WorkoutDay[]> {
-  const stored = readProgram()
-  if (stored.length === 0) {
-    writeProgram(DEFAULT_PROGRAM)
+  const { data, error } = await supabase
+    .from('program')
+    .select('*')
+    .order('sort_order', { ascending: true })
+
+  if (error) throw new Error(error.message)
+
+  if (!data || data.length === 0) {
+    const rows = DEFAULT_PROGRAM.map((day) => ({
+      id: day.id,
+      name: day.name,
+      color: day.color,
+      exercises: day.exercises,
+      sort_order: day.sort_order ?? 0,
+    }))
+    const { error: insertError } = await supabase.from('program').insert(rows)
+    if (insertError) throw new Error(insertError.message)
     return DEFAULT_PROGRAM
   }
-  return stored
+
+  return data.map((row) => ({
+    id: row.id as string,
+    name: row.name as string,
+    color: row.color as WorkoutDay['color'],
+    exercises: row.exercises as WorkoutDay['exercises'],
+    sort_order: row.sort_order as number,
+  }))
 }
 
 async function saveProgram({
@@ -34,14 +43,21 @@ async function saveProgram({
   days: WorkoutDay[]
   deletedIds: string[]
 }): Promise<void> {
-  const current = readProgram()
-  const afterDelete = current.filter((d) => !deletedIds.includes(d.id))
-  const upserted = days.map((day, i) => ({ ...day, sort_order: i }))
-  const merged = [
-    ...afterDelete.filter((d) => !upserted.find((u) => u.id === d.id)),
-    ...upserted,
-  ].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-  writeProgram(merged)
+  if (deletedIds.length > 0) {
+    const { error } = await supabase.from('program').delete().in('id', deletedIds)
+    if (error) throw new Error(error.message)
+  }
+  if (days.length > 0) {
+    const rows = days.map((day, i) => ({
+      id: day.id,
+      name: day.name,
+      color: day.color,
+      exercises: day.exercises,
+      sort_order: i,
+    }))
+    const { error } = await supabase.from('program').upsert(rows)
+    if (error) throw new Error(error.message)
+  }
 }
 
 export function useProgram() {
