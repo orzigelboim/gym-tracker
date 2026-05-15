@@ -85,3 +85,45 @@ export function getPreviousSetsForExercise(
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
 }
+
+/** Returns the sets from the most recent session where this exercise was logged. */
+export function getLastSetsForExercise(
+  sessions: Session[],
+  exerciseId: string
+): { weight: string; reps: string }[] | null {
+  const sorted = [...sessions].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  )
+  for (const session of sorted) {
+    const ex = session.exercises.find((e) => e.id === exerciseId)
+    if (ex && ex.sets.length > 0) return ex.sets
+  }
+  return null
+}
+
+/** Returns the best weight from the most recent session for an exercise, for PR comparison. */
+export function getLastBestForExercise(
+  sessions: Session[],
+  exerciseId: string
+): { weight: number; reps: string; date: string } | null {
+  const sorted = [...sessions].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  )
+  for (const session of sorted) {
+    const ex = session.exercises.find((e) => e.id === exerciseId)
+    if (!ex || ex.sets.length === 0) continue
+    let bestWeight = 0
+    let bestReps = ''
+    for (const set of ex.sets) {
+      const w = parseFloat(set.weight)
+      if (!isNaN(w) && w > bestWeight) {
+        bestWeight = w
+        bestReps = set.reps
+      }
+    }
+    if (bestWeight > 0) {
+      return { weight: bestWeight, reps: bestReps, date: session.created_at.slice(0, 10) }
+    }
+  }
+  return null
+}

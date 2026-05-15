@@ -6,7 +6,7 @@ import { MuscleGroup, WeeklySetsRecord } from '../types'
 import toast from 'react-hot-toast'
 
 function getWeekKey(date: Date): string {
-  return format(startOfWeek(date, { weekStartsOn: 1 }), 'yyyy-MM-dd')
+  return format(startOfWeek(date, { weekStartsOn: 0 }), 'yyyy-MM-dd')
 }
 
 function getWeekLabel(weekKey: string): string {
