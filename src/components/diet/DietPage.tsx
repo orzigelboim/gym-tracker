@@ -1,29 +1,10 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { format, subDays, isToday, isYesterday, parseISO } from 'date-fns'
 import { ChevronLeft, ChevronRight, X, Loader2, Beef } from 'lucide-react'
 import { useProtein } from '../../hooks/useProtein'
-import { ProgressRing } from '../protein/ProgressRing'
+import { useDietChecks } from '../../hooks/useDietChecks'
+import { useSettings } from '../../hooks/useSettings'
 import { Button } from '../ui/Button'
-
-const GOAL_KEY = 'gym-protein-goal'
-const DIET_CHECKS_KEY = (date: string) => `gym-diet-checks-${date}`
-
-interface DietChecks {
-  vegetables: boolean
-  waterOnly: boolean
-}
-
-function loadChecks(date: string): DietChecks {
-  try {
-    const stored = localStorage.getItem(DIET_CHECKS_KEY(date))
-    if (stored) return JSON.parse(stored) as DietChecks
-  } catch { /* ignore */ }
-  return { vegetables: false, waterOnly: false }
-}
-
-function saveChecks(date: string, checks: DietChecks) {
-  localStorage.setItem(DIET_CHECKS_KEY(date), JSON.stringify(checks))
-}
 
 function formatDateLabel(dateStr: string): string {
   const date = parseISO(dateStr)
@@ -67,28 +48,25 @@ function HabitCheckbox({ id, label, emoji, checked, onChange }: {
 
 export function DietPage() {
   const [selectedDate, setSelectedDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
-  const [checks, setChecks] = useState<DietChecks>(() => loadChecks(format(new Date(), 'yyyy-MM-dd')))
   const [foodInput, setFoodInput] = useState('')
   const [gramsInput, setGramsInput] = useState('')
+  const [caloriesInput, setCaloriesInput] = useState('')
 
   const foodRef = useRef<HTMLInputElement>(null)
   const gramsRef = useRef<HTMLInputElement>(null)
+  const caloriesRef = useRef<HTMLInputElement>(null)
 
   const { entries, isLoading, addEntry, deleteEntry } = useProtein(selectedDate)
-
-  // Goal is always driven by Settings body weight — read fresh each render
-  const goal = (() => {
-    const stored = localStorage.getItem(GOAL_KEY)
-    return stored ? parseInt(stored, 10) : 160
-  })()
-
-  useEffect(() => {
-    setChecks(loadChecks(selectedDate))
-  }, [selectedDate])
+  const { checks, updateChecks } = useDietChecks(selectedDate)
+  const { proteinGoal, calorieGoal } = useSettings()
 
   const totalGrams = entries.reduce((sum, e) => sum + e.grams, 0)
-  const remaining = goal - totalGrams
-  const goalReached = totalGrams >= goal
+  const totalCalories = entries.reduce((sum, e) => sum + e.calories, 0)
+  const remainingProtein = proteinGoal - totalGrams
+  const remainingCalories = calorieGoal - totalCalories
+  const proteinGoalReached = totalGrams >= proteinGoal
+  const calorieGoalReached = totalCalories >= calorieGoal
+
   const today = format(new Date(), 'yyyy-MM-dd')
   const isOnToday = selectedDate === today
 
@@ -103,18 +81,18 @@ export function DietPage() {
     }
   }
 
-  function handleCheckChange(key: keyof DietChecks, val: boolean) {
-    const next = { ...checks, [key]: val }
-    setChecks(next)
-    saveChecks(selectedDate, next)
+  function handleCheckChange(key: 'vegetables' | 'waterOnly', val: boolean) {
+    updateChecks({ ...checks, [key]: val })
   }
 
   function handleAddEntry() {
     const grams = parseFloat(gramsInput)
+    const calories = parseFloat(caloriesInput) || 0
     if (!foodInput.trim() || isNaN(grams) || grams <= 0) return
-    addEntry({ date: selectedDate, food_name: foodInput.trim(), grams })
+    addEntry({ date: selectedDate, food_name: foodInput.trim(), grams, calories })
     setFoodInput('')
     setGramsInput('')
+    setCaloriesInput('')
     setTimeout(() => foodRef.current?.focus(), 50)
   }
 
@@ -141,25 +119,50 @@ export function DietPage() {
           checked={checks.waterOnly} onChange={(v) => handleCheckChange('waterOnly', v)} />
       </div>
 
-      {/* Protein summary */}
-      <div className="bg-surface rounded-xl border border-border p-6 flex items-center gap-6">
-        <ProgressRing value={totalGrams} max={goal} size={100} strokeWidth={9} />
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold text-muted uppercase tracking-widest mb-1">Protein</p>
-          <p className="text-3xl font-bold text-protein font-mono">{totalGrams}g</p>
-          {goalReached ? (
-            <p className="text-sm text-lime mt-1 font-medium">Goal reached! 🎉</p>
-          ) : (
-            <p className="text-sm text-muted mt-1">
-              {remaining}g remaining <span className="text-muted2">/ {goal}g goal</span>
-            </p>
-          )}
+      {/* Nutrition summary — calories + protein side by side */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Calories */}
+        <div className="bg-surface rounded-xl border border-border p-4 flex flex-col gap-3">
+          <p className="text-xs font-semibold text-muted uppercase tracking-widest">Calories</p>
+          <p className="text-2xl font-bold font-mono text-text">{totalCalories}<span className="text-sm font-normal text-muted"> kcal</span></p>
+          <div className="h-1.5 bg-surface3 rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-300"
+              style={{
+                width: `${Math.min((totalCalories / calorieGoal) * 100, 100)}%`,
+                backgroundColor: calorieGoalReached ? '#b6f36a' : '#fb923c',
+              }}
+            />
+          </div>
+          {calorieGoalReached
+            ? <p className="text-xs text-lime font-medium">Goal reached!</p>
+            : <p className="text-xs text-muted">{remainingCalories} left <span className="text-muted2">/ {calorieGoal}</span></p>
+          }
+        </div>
+
+        {/* Protein */}
+        <div className="bg-surface rounded-xl border border-border p-4 flex flex-col gap-3">
+          <p className="text-xs font-semibold text-muted uppercase tracking-widest">Protein</p>
+          <p className="text-2xl font-bold font-mono text-protein">{totalGrams}<span className="text-sm font-normal text-muted"> g</span></p>
+          <div className="h-1.5 bg-surface3 rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-300"
+              style={{
+                width: `${Math.min((totalGrams / proteinGoal) * 100, 100)}%`,
+                backgroundColor: proteinGoalReached ? '#b6f36a' : '#60a5fa',
+              }}
+            />
+          </div>
+          {proteinGoalReached
+            ? <p className="text-xs text-lime font-medium">Goal reached!</p>
+            : <p className="text-xs text-muted">{remainingProtein}g left <span className="text-muted2">/ {proteinGoal}g</span></p>
+          }
         </div>
       </div>
 
-      {/* Add protein form */}
+      {/* Add food form */}
       <div className="bg-surface rounded-xl border border-border p-4 flex flex-col gap-3">
-        <h2 className="text-sm font-semibold text-text">Add protein</h2>
+        <h2 className="text-sm font-semibold text-text">Add food</h2>
         <input
           ref={foodRef}
           type="text"
@@ -170,27 +173,46 @@ export function DietPage() {
           aria-label="Food name"
           className="w-full rounded-lg px-3 py-2 text-sm bg-surface2 border border-border2 text-text placeholder:text-muted2 focus:outline-none focus:border-protein focus:ring-2 focus:ring-protein/20 transition-colors duration-150"
         />
-        <div className="flex gap-2">
-          <input
-            ref={gramsRef}
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="1"
-            value={gramsInput}
-            onChange={(e) => setGramsInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddEntry() } }}
-            placeholder="Protein (g)"
-            aria-label="Grams of protein"
-            className="flex-1 rounded-lg px-3 py-2 text-sm bg-surface2 border border-border2 text-text placeholder:text-muted2 focus:outline-none focus:border-protein focus:ring-2 focus:ring-protein/20 transition-colors duration-150"
-          />
-          <Button variant="primary" size="md" onClick={handleAddEntry} disabled={!foodInput.trim() || !gramsInput}>
-            Add
-          </Button>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="relative">
+            <input
+              ref={gramsRef}
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="1"
+              value={gramsInput}
+              onChange={(e) => setGramsInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); caloriesRef.current?.focus() } }}
+              placeholder="Protein"
+              aria-label="Grams of protein"
+              className="w-full rounded-lg px-3 py-2 pr-7 text-sm bg-surface2 border border-border2 text-text placeholder:text-muted2 focus:outline-none focus:border-protein focus:ring-2 focus:ring-protein/20 transition-colors duration-150"
+            />
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted2 pointer-events-none">g</span>
+          </div>
+          <div className="relative">
+            <input
+              ref={caloriesRef}
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="1"
+              value={caloriesInput}
+              onChange={(e) => setCaloriesInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddEntry() } }}
+              placeholder="Calories"
+              aria-label="Calories"
+              className="w-full rounded-lg px-3 py-2 pr-10 text-sm bg-surface2 border border-border2 text-text placeholder:text-muted2 focus:outline-none focus:border-lime focus:ring-2 focus:ring-lime/20 transition-colors duration-150"
+            />
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted2 pointer-events-none">kcal</span>
+          </div>
         </div>
+        <Button variant="primary" size="md" onClick={handleAddEntry} disabled={!foodInput.trim() || !gramsInput} className="w-full">
+          Add food
+        </Button>
       </div>
 
-      {/* Entries */}
+      {/* Entries list */}
       <div className="flex flex-col gap-3">
         <h2 className="text-xs font-semibold text-muted uppercase tracking-widest">
           {formatDateLabel(selectedDate)}'s entries
@@ -210,7 +232,12 @@ export function DietPage() {
             {entries.map((entry) => (
               <div key={entry.id} className="flex items-center justify-between gap-3 px-4 py-3 bg-surface rounded-lg border border-border hover:border-border2 transition-colors duration-150">
                 <span className="text-sm text-text flex-1 min-w-0 truncate">{entry.food_name}</span>
-                <span className="text-sm font-mono font-semibold text-protein flex-shrink-0">{entry.grams}g</span>
+                <div className="flex items-center gap-3 shrink-0">
+                  {entry.calories > 0 && (
+                    <span className="text-xs font-mono text-muted">{entry.calories} kcal</span>
+                  )}
+                  <span className="text-sm font-mono font-semibold text-protein">{entry.grams}g</span>
+                </div>
                 <Button variant="icon" size="sm" onClick={() => deleteEntry(entry.id)}
                   aria-label={`Delete ${entry.food_name}`} className="text-muted2 hover:text-danger flex-shrink-0">
                   <X size={14} />

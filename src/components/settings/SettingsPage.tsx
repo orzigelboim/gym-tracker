@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useProgram } from '../../hooks/useProgram'
-import { WorkoutDay, Exercise } from '../../types'
+import { useWeeklySets } from '../../hooks/useWeeklySets'
+import { useSettings } from '../../hooks/useSettings'
+import { WorkoutDay, Exercise, MuscleGroup } from '../../types'
 import { Button } from '../ui/Button'
 import { DAY_COLORS } from '../../lib/constants'
-import { Plus, X, Save, Loader2, Trash2, Weight, LayoutGrid } from 'lucide-react'
+import { Plus, X, Save, Loader2, Trash2, Weight, LayoutGrid, History, ChevronRight, Layers, CalendarDays, Pencil } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-const BODY_WEIGHT_KEY = 'gym-body-weight'
-const PROTEIN_GOAL_KEY = 'gym-protein-goal'
 const PROTEIN_PER_KG = 2.2
 
 const COLOR_OPTIONS = [
@@ -55,10 +56,27 @@ function ColorPicker({ value, onChange }: { value: DayColor; onChange: (c: DayCo
 }
 
 export function SettingsPage() {
+  const navigate = useNavigate()
   const { program, isLoading: programLoading, updateProgram, isSaving } = useProgram()
+  const { bodyWeight: savedWeight, saveBodyWeight, isSavingWeight, calorieGoal: savedCalorieGoal, saveCalorieGoal, isSavingCalories } = useSettings()
+  const {
+    muscleGroups,
+    addMuscleGroup,
+    updateMuscleGroup,
+    deleteMuscleGroup,
+    weekHistory,
+  } = useWeeklySets()
   const [localProgram, setLocalProgram] = useState<WorkoutDay[]>([])
   const [deletedDayIds, setDeletedDayIds] = useState<string[]>([])
-  const [bodyWeight, setBodyWeight] = useState(() => localStorage.getItem(BODY_WEIGHT_KEY) ?? '')
+  const [bodyWeight, setBodyWeight] = useState('')
+  const [calorieGoalInput, setCalorieGoalInput] = useState('')
+
+  // Muscle group form state
+  const [newMgName, setNewMgName] = useState('')
+  const [newMgTarget, setNewMgTarget] = useState('10')
+  const [editingMgId, setEditingMgId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editTarget, setEditTarget] = useState('')
 
   useEffect(() => {
     if (program.length > 0) {
@@ -67,16 +85,26 @@ export function SettingsPage() {
     }
   }, [program])
 
-  // ── Body weight — auto-saves on blur or Enter ──────────────
+  // Populate inputs once settings load from Supabase
+  useEffect(() => {
+    if (savedWeight !== null && bodyWeight === '') {
+      setBodyWeight(String(savedWeight))
+    }
+  }, [savedWeight])
+
+  useEffect(() => {
+    if (savedCalorieGoal && calorieGoalInput === '') {
+      setCalorieGoalInput(String(savedCalorieGoal))
+    }
+  }, [savedCalorieGoal])
+
+  // ── Body weight — saves to Supabase on blur or Enter ──────────────
   function commitBodyWeight(val: string) {
     const kg = parseFloat(val)
     if (isNaN(kg) || kg <= 0) return
-    const proteinGoal = Math.round(kg * PROTEIN_PER_KG)
-    localStorage.setItem(BODY_WEIGHT_KEY, String(kg))
-    localStorage.setItem(PROTEIN_GOAL_KEY, String(proteinGoal))
+    saveBodyWeight(kg)
   }
 
-  const savedKg = parseFloat(localStorage.getItem(BODY_WEIGHT_KEY) ?? '')
   const proteinGoalPreview = (() => {
     const kg = parseFloat(bodyWeight)
     return isNaN(kg) || kg <= 0 ? null : Math.round(kg * PROTEIN_PER_KG)
@@ -182,8 +210,11 @@ export function SettingsPage() {
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted2 pointer-events-none">kg</span>
           </div>
-          {!isNaN(savedKg) && savedKg > 0 && parseFloat(bodyWeight) !== savedKg && (
+          {savedWeight !== null && parseFloat(bodyWeight) !== savedWeight && (
             <p className="text-xs text-muted2">Tap outside the field to save</p>
+          )}
+          {isSavingWeight && (
+            <p className="text-xs text-muted2 flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Saving…</p>
           )}
           {proteinGoalPreview !== null && (
             <div className="flex items-center gap-2 px-3 py-2 bg-surface2 rounded-lg border border-border2">
@@ -191,6 +222,33 @@ export function SettingsPage() {
               <span className="text-sm font-semibold font-mono text-protein">{proteinGoalPreview}g</span>
             </div>
           )}
+
+          {/* Calorie goal */}
+          <div className="pt-2 border-t border-border flex flex-col gap-3">
+            <div>
+              <p className="text-sm font-medium text-text">Daily calorie goal</p>
+              <p className="text-xs text-muted2 mt-0.5">Set your target for a caloric surplus (e.g. maintenance + 200–300 kcal).</p>
+            </div>
+            <div className="relative max-w-[160px]">
+              <input
+                id="calorie-goal"
+                type="number"
+                inputMode="numeric"
+                min="0"
+                step="50"
+                value={calorieGoalInput}
+                onChange={(e) => setCalorieGoalInput(e.target.value)}
+                onBlur={(e) => { const v = parseInt(e.target.value); if (!isNaN(v) && v > 0) saveCalorieGoal(v) }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { const v = parseInt(calorieGoalInput); if (!isNaN(v) && v > 0) { saveCalorieGoal(v); (e.target as HTMLInputElement).blur() } } }}
+                placeholder="e.g. 2400"
+                className="w-full rounded-lg px-3 py-2 text-sm pr-12 bg-surface2 border border-border2 text-text placeholder:text-muted2 focus:outline-none focus:border-lime focus:ring-2 focus:ring-lime/20 transition-colors duration-150"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted2 pointer-events-none">kcal</span>
+            </div>
+            {isSavingCalories && (
+              <p className="text-xs text-muted2 flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Saving…</p>
+            )}
+          </div>
         </div>
       </Section>
 
@@ -292,6 +350,139 @@ export function SettingsPage() {
               : <><Save size={16} /> Save Program</>}
           </Button>
         </div>
+      </Section>
+
+      {/* ── HISTORY LINK ────────────────────────────────── */}
+      <Section icon={<History size={16} />} title="History">
+        <div className="bg-surface rounded-xl border border-border p-4 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-text">Workout History</p>
+            <p className="text-xs text-muted2 mt-0.5">View all past workout sessions</p>
+          </div>
+          <button
+            onClick={() => navigate('/history')}
+            className="flex items-center gap-1.5 text-sm text-muted hover:text-lime transition-colors duration-150"
+          >
+            View <ChevronRight size={14} />
+          </button>
+        </div>
+      </Section>
+
+      {/* ── MUSCLE GROUPS ───────────────────────────────── */}
+      <Section icon={<Layers size={16} />} title="Muscle Groups">
+        <div className="flex flex-col gap-2">
+          {muscleGroups.map((mg: MuscleGroup) =>
+            editingMgId === mg.id ? (
+              <div key={mg.id} className="bg-surface rounded-xl border border-border p-3 flex items-center gap-2">
+                <input
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  placeholder="Muscle group name"
+                  className="flex-1 rounded-lg px-2.5 py-1.5 text-sm bg-surface2 border border-border2 text-text placeholder:text-muted2 focus:outline-none focus:border-lime focus:ring-2 focus:ring-lime/20 transition-colors duration-150"
+                />
+                <input
+                  type="number"
+                  value={editTarget}
+                  onChange={e => setEditTarget(e.target.value)}
+                  min="1"
+                  className="w-16 rounded-lg px-1 py-1.5 text-sm text-center bg-surface2 border border-border2 text-text focus:outline-none focus:border-lime focus:ring-2 focus:ring-lime/20 transition-colors duration-150"
+                />
+                <span className="text-xs text-muted2 shrink-0">sets/wk</span>
+                <Button variant="icon" size="sm" onClick={() => {
+                  if (!editName.trim()) return
+                  updateMuscleGroup(mg.id, editName.trim(), parseInt(editTarget) || 1)
+                  setEditingMgId(null)
+                }}>
+                  <Save size={13} />
+                </Button>
+                <Button variant="icon" size="sm" onClick={() => setEditingMgId(null)}>
+                  <X size={13} />
+                </Button>
+              </div>
+            ) : (
+              <div key={mg.id} className="bg-surface rounded-xl border border-border px-4 py-3 flex items-center gap-3">
+                <p className="flex-1 text-sm text-text">{mg.name}</p>
+                <p className="text-xs font-mono text-muted">{mg.weeklyTarget} sets/wk</p>
+                <Button variant="icon" size="sm" onClick={() => {
+                  setEditingMgId(mg.id)
+                  setEditName(mg.name)
+                  setEditTarget(String(mg.weeklyTarget))
+                }}>
+                  <Pencil size={13} />
+                </Button>
+                <Button variant="icon" size="sm" className="text-muted2 hover:text-danger"
+                  onClick={() => {
+                    if (!window.confirm(`Delete "${mg.name}"?`)) return
+                    deleteMuscleGroup(mg.id)
+                  }}>
+                  <Trash2 size={13} />
+                </Button>
+              </div>
+            )
+          )}
+
+          {/* Add new muscle group */}
+          <div className="flex items-center gap-2 mt-1">
+            <input
+              value={newMgName}
+              onChange={e => setNewMgName(e.target.value)}
+              placeholder="New muscle group"
+              className="flex-1 rounded-lg px-2.5 py-1.5 text-sm bg-surface2 border border-border2 text-text placeholder:text-muted2 focus:outline-none focus:border-lime focus:ring-2 focus:ring-lime/20 transition-colors duration-150"
+            />
+            <input
+              type="number"
+              value={newMgTarget}
+              onChange={e => setNewMgTarget(e.target.value)}
+              min="1"
+              className="w-16 rounded-lg px-1 py-1.5 text-sm text-center bg-surface2 border border-border2 text-text focus:outline-none focus:border-lime focus:ring-2 focus:ring-lime/20 transition-colors duration-150"
+            />
+            <span className="text-xs text-muted2 shrink-0">sets/wk</span>
+            <Button variant="primary" size="sm" onClick={() => {
+              if (!newMgName.trim()) { toast.error('Enter a muscle group name'); return }
+              addMuscleGroup(newMgName.trim(), parseInt(newMgTarget) || 1)
+              setNewMgName('')
+              setNewMgTarget('10')
+              toast.success('Muscle group added')
+            }}>
+              <Plus size={13} /> Add
+            </Button>
+          </div>
+        </div>
+      </Section>
+
+      {/* ── SETS HISTORY ────────────────────────────────── */}
+      <Section icon={<CalendarDays size={16} />} title="Sets History">
+        {weekHistory.length === 0 ? (
+          <p className="text-sm text-muted2">No previous weeks recorded yet.</p>
+        ) : (
+          <div className="flex flex-col gap-3 max-h-[400px] overflow-y-auto pr-1">
+            {weekHistory.map(({ weekKey, weekLabel, sets }) => (
+              <div key={weekKey} className="bg-surface rounded-xl border border-border p-4">
+                <p className="text-xs font-semibold text-muted mb-3 uppercase tracking-wide">{weekLabel}</p>
+                <div className="flex flex-col gap-1.5">
+                  {muscleGroups.map((mg: MuscleGroup) => (
+                    <div key={mg.id} className="flex items-center justify-between">
+                      <p className="text-xs text-muted2">{mg.name}</p>
+                      <p className="text-xs font-mono text-text">
+                        {sets[mg.id] ?? 0}
+                        <span className="text-muted2"> / {mg.weeklyTarget}</span>
+                      </p>
+                    </div>
+                  ))}
+                  {Object.keys(sets)
+                    .filter(id => !muscleGroups.find((mg: MuscleGroup) => mg.id === id))
+                    .map(id => (
+                      <div key={id} className="flex items-center justify-between opacity-50">
+                        <p className="text-xs text-muted2 italic">Deleted group</p>
+                        <p className="text-xs font-mono text-muted">{sets[id]}</p>
+                      </div>
+                    ))
+                  }
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </Section>
 
     </div>

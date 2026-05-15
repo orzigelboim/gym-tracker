@@ -1,8 +1,8 @@
 import { NavLink } from 'react-router-dom'
 import {
-  Dumbbell,
+  LayoutDashboard,
   UtensilsCrossed,
-  ClipboardList,
+  BarChart2,
   TrendingUp,
   Settings,
 } from 'lucide-react'
@@ -14,9 +14,9 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { to: '/', label: 'Log', icon: <Dumbbell size={20} /> },
+  { to: '/', label: 'Home', icon: <LayoutDashboard size={20} /> },
   { to: '/diet', label: 'Diet', icon: <UtensilsCrossed size={20} /> },
-  { to: '/history', label: 'History', icon: <ClipboardList size={20} /> },
+  { to: '/sets', label: 'Sets', icon: <BarChart2 size={20} /> },
   { to: '/progress', label: 'Progress', icon: <TrendingUp size={20} /> },
   { to: '/settings', label: 'Settings', icon: <Settings size={20} /> },
 ]

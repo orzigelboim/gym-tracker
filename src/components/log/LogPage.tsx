@@ -4,6 +4,7 @@ import { useSessions } from '../../hooks/useSessions'
 import { DayTabs } from './DayTabs'
 import { ExerciseCard } from './ExerciseCard'
 import { Button } from '../ui/Button'
+import { DashboardSummary } from '../dashboard/DashboardSummary'
 import { SetData, LoggedExercise } from '../../types'
 import { getPRsFromSessions, getPreviousSetsForExercise } from '../../lib/utils'
 import { Loader2, Save } from 'lucide-react'
@@ -93,6 +94,9 @@ export function LogPage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
+      {/* Dashboard summary — today's nutrition + weekly sets */}
+      <DashboardSummary />
+
       {/* Day tabs */}
       <DayTabs days={program} activeIndex={currentDayIndex} onChange={handleDayChange} />
 
