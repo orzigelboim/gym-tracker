@@ -41,3 +41,11 @@ export interface ProteinEntry {
   grams: number
   created_at: string
 }
+
+export interface MuscleGroup {
+  id: string
+  name: string
+  weeklyTarget: number
+}
+
+export type WeeklySetsRecord = Record<string, number>

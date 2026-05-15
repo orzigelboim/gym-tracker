@@ -7,6 +7,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/': 'Log Workout',
   '/diet': 'Diet',
   '/history': 'History',
+  '/sets': 'Weekly Sets',
   '/progress': 'Progress',
   '/settings': 'Settings',
 }

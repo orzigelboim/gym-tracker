@@ -8,6 +8,7 @@ import { DietPage } from './components/diet/DietPage'
 import { HistoryPage } from './components/history/HistoryPage'
 import { ProgressPage } from './components/progress/ProgressPage'
 import { SettingsPage } from './components/settings/SettingsPage'
+import { SetsPage } from './components/sets/SetsPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,6 +23,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/': 'Log Workout — Gym Tracker',
   '/diet': 'Diet — Gym Tracker',
   '/history': 'History — Gym Tracker',
+  '/sets': 'Weekly Sets — Gym Tracker',
   '/progress': 'Progress — Gym Tracker',
   '/settings': 'Settings — Gym Tracker',
 }
@@ -47,6 +49,7 @@ export function App() {
             <Route path="/diet" element={<DietPage />} />
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/progress" element={<ProgressPage />} />
+            <Route path="/sets" element={<SetsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
         </Routes>
