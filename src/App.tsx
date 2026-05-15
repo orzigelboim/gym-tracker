@@ -20,7 +20,7 @@ const queryClient = new QueryClient({
 })
 
 const PAGE_TITLES: Record<string, string> = {
-  '/': 'Log Workout — Gym Tracker',
+  '/': 'Dashboard — Gym Tracker',
   '/diet': 'Diet — Gym Tracker',
   '/history': 'History — Gym Tracker',
   '/sets': 'Weekly Sets — Gym Tracker',

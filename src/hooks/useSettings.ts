@@ -32,6 +32,7 @@ export function useSettings() {
     : bodyWeight
       ? Math.round(bodyWeight * PROTEIN_PER_KG)
       : 160
+  const calorieGoal = settings.calorie_goal ? parseInt(settings.calorie_goal, 10) : 2200
 
   const saveBodyWeight = useMutation({
     mutationFn: async (kg: number) => {
@@ -48,11 +49,25 @@ export function useSettings() {
     },
   })
 
+  const saveCalorieGoal = useMutation({
+    mutationFn: (kcal: number) => upsertSetting('calorie_goal', String(kcal)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settings'] })
+      toast.success('Calorie goal saved')
+    },
+    onError: (err: Error) => {
+      toast.error(`Failed to save: ${err.message}`)
+    },
+  })
+
   return {
     isLoading,
     bodyWeight,
     proteinGoal,
+    calorieGoal,
     saveBodyWeight: saveBodyWeight.mutate,
     isSavingWeight: saveBodyWeight.isPending,
+    saveCalorieGoal: saveCalorieGoal.mutate,
+    isSavingCalories: saveCalorieGoal.isPending,
   }
 }

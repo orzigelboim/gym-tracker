@@ -67,6 +67,7 @@ export function ProteinPage() {
       date: selectedDate,
       food_name: foodInput.trim(),
       grams,
+      calories: 0,
     })
 
     setFoodInput('')

@@ -4,7 +4,7 @@ import { Sidebar } from './Sidebar'
 import { BottomNav } from './BottomNav'
 
 const PAGE_TITLES: Record<string, string> = {
-  '/': 'Log Workout',
+  '/': 'Dashboard',
   '/diet': 'Diet',
   '/history': 'History',
   '/sets': 'Weekly Sets',

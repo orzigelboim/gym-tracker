@@ -58,7 +58,7 @@ function ColorPicker({ value, onChange }: { value: DayColor; onChange: (c: DayCo
 export function SettingsPage() {
   const navigate = useNavigate()
   const { program, isLoading: programLoading, updateProgram, isSaving } = useProgram()
-  const { bodyWeight: savedWeight, saveBodyWeight, isSavingWeight } = useSettings()
+  const { bodyWeight: savedWeight, saveBodyWeight, isSavingWeight, calorieGoal: savedCalorieGoal, saveCalorieGoal, isSavingCalories } = useSettings()
   const {
     muscleGroups,
     addMuscleGroup,
@@ -69,6 +69,7 @@ export function SettingsPage() {
   const [localProgram, setLocalProgram] = useState<WorkoutDay[]>([])
   const [deletedDayIds, setDeletedDayIds] = useState<string[]>([])
   const [bodyWeight, setBodyWeight] = useState('')
+  const [calorieGoalInput, setCalorieGoalInput] = useState('')
 
   // Muscle group form state
   const [newMgName, setNewMgName] = useState('')
@@ -84,12 +85,18 @@ export function SettingsPage() {
     }
   }, [program])
 
-  // Populate input once body weight loads from Supabase
+  // Populate inputs once settings load from Supabase
   useEffect(() => {
     if (savedWeight !== null && bodyWeight === '') {
       setBodyWeight(String(savedWeight))
     }
   }, [savedWeight])
+
+  useEffect(() => {
+    if (savedCalorieGoal && calorieGoalInput === '') {
+      setCalorieGoalInput(String(savedCalorieGoal))
+    }
+  }, [savedCalorieGoal])
 
   // ── Body weight — saves to Supabase on blur or Enter ──────────────
   function commitBodyWeight(val: string) {
@@ -215,6 +222,33 @@ export function SettingsPage() {
               <span className="text-sm font-semibold font-mono text-protein">{proteinGoalPreview}g</span>
             </div>
           )}
+
+          {/* Calorie goal */}
+          <div className="pt-2 border-t border-border flex flex-col gap-3">
+            <div>
+              <p className="text-sm font-medium text-text">Daily calorie goal</p>
+              <p className="text-xs text-muted2 mt-0.5">Set your target for a caloric surplus (e.g. maintenance + 200–300 kcal).</p>
+            </div>
+            <div className="relative max-w-[160px]">
+              <input
+                id="calorie-goal"
+                type="number"
+                inputMode="numeric"
+                min="0"
+                step="50"
+                value={calorieGoalInput}
+                onChange={(e) => setCalorieGoalInput(e.target.value)}
+                onBlur={(e) => { const v = parseInt(e.target.value); if (!isNaN(v) && v > 0) saveCalorieGoal(v) }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { const v = parseInt(calorieGoalInput); if (!isNaN(v) && v > 0) { saveCalorieGoal(v); (e.target as HTMLInputElement).blur() } } }}
+                placeholder="e.g. 2400"
+                className="w-full rounded-lg px-3 py-2 text-sm pr-12 bg-surface2 border border-border2 text-text placeholder:text-muted2 focus:outline-none focus:border-lime focus:ring-2 focus:ring-lime/20 transition-colors duration-150"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted2 pointer-events-none">kcal</span>
+            </div>
+            {isSavingCalories && (
+              <p className="text-xs text-muted2 flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Saving…</p>
+            )}
+          </div>
         </div>
       </Section>
 

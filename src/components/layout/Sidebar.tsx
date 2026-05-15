@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { format } from 'date-fns'
 import {
-  Dumbbell,
+  LayoutDashboard,
   UtensilsCrossed,
   BarChart2,
   TrendingUp,
@@ -15,7 +15,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { to: '/', label: 'Log Workout', icon: <Dumbbell size={18} /> },
+  { to: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
   { to: '/diet', label: 'Diet', icon: <UtensilsCrossed size={18} /> },
   { to: '/sets', label: 'Sets', icon: <BarChart2 size={18} /> },
   { to: '/progress', label: 'Progress', icon: <TrendingUp size={18} /> },

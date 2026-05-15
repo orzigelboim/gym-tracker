@@ -39,6 +39,7 @@ export interface ProteinEntry {
   date: string
   food_name: string
   grams: number
+  calories: number
   created_at: string
 }
 
