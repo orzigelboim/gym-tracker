@@ -15,7 +15,7 @@ interface AddEntryData {
 
 async function fetchEntries(date: string): Promise<ProteinEntry[]> {
   const { data, error } = await supabase
-    .from('protein_entries')
+    .from('protein_logs')
     .select('*')
     .eq('date', date)
     .order('created_at', { ascending: true })
@@ -33,7 +33,7 @@ async function fetchEntries(date: string): Promise<ProteinEntry[]> {
 
 async function insertEntry(data: AddEntryData): Promise<ProteinEntry> {
   const { data: result, error } = await supabase
-    .from('protein_entries')
+    .from('protein_logs')
     .insert([data])
     .select()
     .single()
@@ -43,7 +43,7 @@ async function insertEntry(data: AddEntryData): Promise<ProteinEntry> {
 }
 
 async function removeEntry(id: number): Promise<void> {
-  const { error } = await supabase.from('protein_entries').delete().eq('id', id)
+  const { error } = await supabase.from('protein_logs').delete().eq('id', id)
   if (error) throw new Error(error.message)
 }
 

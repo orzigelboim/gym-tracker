@@ -1,29 +1,11 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { format, subDays, isToday, isYesterday, parseISO } from 'date-fns'
 import { ChevronLeft, ChevronRight, X, Loader2, Beef } from 'lucide-react'
 import { useProtein } from '../../hooks/useProtein'
+import { useDietChecks } from '../../hooks/useDietChecks'
+import { useSettings } from '../../hooks/useSettings'
 import { ProgressRing } from '../protein/ProgressRing'
 import { Button } from '../ui/Button'
-
-const GOAL_KEY = 'gym-protein-goal'
-const DIET_CHECKS_KEY = (date: string) => `gym-diet-checks-${date}`
-
-interface DietChecks {
-  vegetables: boolean
-  waterOnly: boolean
-}
-
-function loadChecks(date: string): DietChecks {
-  try {
-    const stored = localStorage.getItem(DIET_CHECKS_KEY(date))
-    if (stored) return JSON.parse(stored) as DietChecks
-  } catch { /* ignore */ }
-  return { vegetables: false, waterOnly: false }
-}
-
-function saveChecks(date: string, checks: DietChecks) {
-  localStorage.setItem(DIET_CHECKS_KEY(date), JSON.stringify(checks))
-}
 
 function formatDateLabel(dateStr: string): string {
   const date = parseISO(dateStr)
@@ -67,7 +49,6 @@ function HabitCheckbox({ id, label, emoji, checked, onChange }: {
 
 export function DietPage() {
   const [selectedDate, setSelectedDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
-  const [checks, setChecks] = useState<DietChecks>(() => loadChecks(format(new Date(), 'yyyy-MM-dd')))
   const [foodInput, setFoodInput] = useState('')
   const [gramsInput, setGramsInput] = useState('')
 
@@ -75,16 +56,8 @@ export function DietPage() {
   const gramsRef = useRef<HTMLInputElement>(null)
 
   const { entries, isLoading, addEntry, deleteEntry } = useProtein(selectedDate)
-
-  // Goal is always driven by Settings body weight — read fresh each render
-  const goal = (() => {
-    const stored = localStorage.getItem(GOAL_KEY)
-    return stored ? parseInt(stored, 10) : 160
-  })()
-
-  useEffect(() => {
-    setChecks(loadChecks(selectedDate))
-  }, [selectedDate])
+  const { checks, updateChecks } = useDietChecks(selectedDate)
+  const { proteinGoal: goal } = useSettings()
 
   const totalGrams = entries.reduce((sum, e) => sum + e.grams, 0)
   const remaining = goal - totalGrams
@@ -103,10 +76,8 @@ export function DietPage() {
     }
   }
 
-  function handleCheckChange(key: keyof DietChecks, val: boolean) {
-    const next = { ...checks, [key]: val }
-    setChecks(next)
-    saveChecks(selectedDate, next)
+  function handleCheckChange(key: 'vegetables' | 'waterOnly', val: boolean) {
+    updateChecks({ ...checks, [key]: val })
   }
 
   function handleAddEntry() {

@@ -2,14 +2,13 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProgram } from '../../hooks/useProgram'
 import { useWeeklySets } from '../../hooks/useWeeklySets'
+import { useSettings } from '../../hooks/useSettings'
 import { WorkoutDay, Exercise, MuscleGroup } from '../../types'
 import { Button } from '../ui/Button'
 import { DAY_COLORS } from '../../lib/constants'
 import { Plus, X, Save, Loader2, Trash2, Weight, LayoutGrid, History, ChevronRight, Layers, CalendarDays, Pencil } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-const BODY_WEIGHT_KEY = 'gym-body-weight'
-const PROTEIN_GOAL_KEY = 'gym-protein-goal'
 const PROTEIN_PER_KG = 2.2
 
 const COLOR_OPTIONS = [
@@ -59,6 +58,7 @@ function ColorPicker({ value, onChange }: { value: DayColor; onChange: (c: DayCo
 export function SettingsPage() {
   const navigate = useNavigate()
   const { program, isLoading: programLoading, updateProgram, isSaving } = useProgram()
+  const { bodyWeight: savedWeight, saveBodyWeight, isSavingWeight } = useSettings()
   const {
     muscleGroups,
     addMuscleGroup,
@@ -68,7 +68,7 @@ export function SettingsPage() {
   } = useWeeklySets()
   const [localProgram, setLocalProgram] = useState<WorkoutDay[]>([])
   const [deletedDayIds, setDeletedDayIds] = useState<string[]>([])
-  const [bodyWeight, setBodyWeight] = useState(() => localStorage.getItem(BODY_WEIGHT_KEY) ?? '')
+  const [bodyWeight, setBodyWeight] = useState('')
 
   // Muscle group form state
   const [newMgName, setNewMgName] = useState('')
@@ -84,16 +84,20 @@ export function SettingsPage() {
     }
   }, [program])
 
-  // ── Body weight — auto-saves on blur or Enter ──────────────
+  // Populate input once body weight loads from Supabase
+  useEffect(() => {
+    if (savedWeight !== null && bodyWeight === '') {
+      setBodyWeight(String(savedWeight))
+    }
+  }, [savedWeight])
+
+  // ── Body weight — saves to Supabase on blur or Enter ──────────────
   function commitBodyWeight(val: string) {
     const kg = parseFloat(val)
     if (isNaN(kg) || kg <= 0) return
-    const proteinGoal = Math.round(kg * PROTEIN_PER_KG)
-    localStorage.setItem(BODY_WEIGHT_KEY, String(kg))
-    localStorage.setItem(PROTEIN_GOAL_KEY, String(proteinGoal))
+    saveBodyWeight(kg)
   }
 
-  const savedKg = parseFloat(localStorage.getItem(BODY_WEIGHT_KEY) ?? '')
   const proteinGoalPreview = (() => {
     const kg = parseFloat(bodyWeight)
     return isNaN(kg) || kg <= 0 ? null : Math.round(kg * PROTEIN_PER_KG)
@@ -199,8 +203,11 @@ export function SettingsPage() {
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted2 pointer-events-none">kg</span>
           </div>
-          {!isNaN(savedKg) && savedKg > 0 && parseFloat(bodyWeight) !== savedKg && (
+          {savedWeight !== null && parseFloat(bodyWeight) !== savedWeight && (
             <p className="text-xs text-muted2">Tap outside the field to save</p>
+          )}
+          {isSavingWeight && (
+            <p className="text-xs text-muted2 flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Saving…</p>
           )}
           {proteinGoalPreview !== null && (
             <div className="flex items-center gap-2 px-3 py-2 bg-surface2 rounded-lg border border-border2">
